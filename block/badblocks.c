@@ -1569,6 +1569,105 @@ ssize_t badblocks_store(struct badblocks *bb, const char *page, size_t len,
 	else
 		return len;
 }
+// Declaration of the badblocks structure
+struct badblocks {
+    struct device *dev;
+    void *page;
+    int count;
+    int shift;
+    seqlock_t lock;
+};
+
+// Prototypes for internal use functions
+static int __badblocks_init(struct device *dev, struct badblocks *bb, int enable);
+
+/**
+ * __badblocks_init - Helper function to initialize badblocks structure.
+ * @dev: Pointer to the associated device structure (can be NULL).
+ * @bb: Pointer to the badblocks structure to initialize.
+ * @enable: Flag to enable bad block tracking.
+ *
+ * Return: 0 on success, -ENOMEM if memory allocation fails.
+ */
+static int __badblocks_init(struct device *dev, struct badblocks *bb, int enable)
+{
+    bb->dev = dev;
+    bb->count = 0;
+    bb->shift = enable ? 0 : -1;
+
+    if (dev)
+        bb->page = devm_kzalloc(dev, PAGE_SIZE, GFP_KERNEL);
+    else
+        bb->page = kzalloc(PAGE_SIZE, GFP_KERNEL);
+
+    if (!bb->page) {
+        bb->shift = -1;
+        return -ENOMEM;
+    }
+
+    seqlock_init(&bb->lock);
+    return 0;
+}
+
+/**
+ * badblocks_init - Public API to initialize the badblocks structure.
+ * @bb: Pointer to the badblocks structure.
+ * @enable: Flag to enable bad block tracking.
+ *
+ * Return: 0 on success, negative error code on failure.
+ */
+int badblocks_init(struct badblocks *bb, int enable)
+{
+    return __badblocks_init(NULL, bb, enable);
+}
+EXPORT_SYMBOL_GPL(badblocks_init);
+
+/**
+ * devm_init_badblocks - Initialize badblocks with device memory management.
+ * @dev: Device associated with the badblocks.
+ * @bb: Pointer to the badblocks structure.
+ *
+ * Return: 0 on success, -EINVAL if bb is NULL.
+ */
+int devm_init_badblocks(struct device *dev, struct badblocks *bb)
+{
+    if (!bb)
+        return -EINVAL;
+    return __badblocks_init(dev, bb, 1);
+}
+EXPORT_SYMBOL_GPL(devm_init_badblocks);
+
+/**
+ * badblocks_exit - Clean up the badblocks structure.
+ * @bb: Pointer to the badblocks structure.
+ */
+void badblocks_exit(struct badblocks *bb)
+{
+    if (!bb)
+        return;
+
+    if (bb->dev)
+        devm_kfree(bb->dev, bb->page);
+    else
+        kfree(bb->page);
+
+    bb->page = NULL;
+}
+EXPORT_SYMBOL_GPL(badblocks_exit);
+
+/**
+ * display_badblocks - Display bad block information.
+ * @bb: Pointer to the badblocks structure.
+ */
+void display_badblocks(struct badblocks *bb)
+{
+    if (!bb)
+        return;
+
+    printk("Bad Blocks Count: %d\n", bb->count);
+    // Additional display logic can be added here.
+}
+EXPORT_SYMBOL_GPL(display_badblocks);
 EXPORT_SYMBOL_GPL(badblocks_store);
 
 static int __badblocks_init(struct device *dev, struct badblocks *bb,
