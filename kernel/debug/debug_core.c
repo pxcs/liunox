@@ -1170,6 +1170,77 @@ EXPORT_SYMBOL_GPL(kgdb_register_io_module);
  *	Unregister it with the KGDB core.
  */
 void kgdb_unregister_io_module(struct kgdb_io *old_dbg_io_ops)
+/* Global spinlock for KGDB registration */
+static DEFINE_SPINLOCK(kgdb_registration_lock);
+static struct kgdb_io *dbg_io_ops = NULL;  // Pointer to current KGDB I/O operations
+
+/* Helper function to log errors */
+static inline void log_error(const char *error, const char *current_driver, const char *new_driver) {
+    if (current_driver && new_driver) {
+        pr_err("KGDB Error: %s - Current: %s, New: %s\n", error, current_driver, new_driver);
+    } else {
+        pr_err("KGDB Error: %s\n", error);
+    }
+}
+
+/* Helper function to log information */
+static inline void log_info(const char *info, const char *driver) {
+    if (driver) {
+        pr_info("KGDB: %s - %s\n", info, driver);
+    } else {
+        pr_info("KGDB: %s\n", info);
+    }
+}
+
+/**
+ * Registers a new KGDB I/O module, replacing the old one if necessary.
+ * @param new_dbg_io_ops Pointer to new I/O operations.
+ * @return 0 on success, negative error code on failure.
+ */
+int kgdb_register_io_module(struct kgdb_io *new_dbg_io_ops) {
+    struct kgdb_io *old_dbg_io_ops;
+    int err;
+
+    if (!new_dbg_io_ops) {
+        log_error("Invalid new I/O operations provided", NULL, NULL);
+        return -EINVAL;
+    }
+
+    spin_lock(&kgdb_registration_lock);
+
+    old_dbg_io_ops = dbg_io_ops;
+    if (old_dbg_io_ops) {
+        if (!old_dbg_io_ops->deinit) {
+            spin_unlock(&kgdb_registration_lock);
+            log_error("Cannot replace I/O driver because deinit is missing", old_dbg_io_ops->name, new_dbg_io_ops->name);
+            return -EBUSY;
+        }
+        log_info("Replacing I/O driver", old_dbg_io_ops->name);
+    }
+
+    if (new_dbg_io_ops->init) {
+        err = new_dbg_io_ops->init();
+        if (err) {
+            spin_unlock(&kgdb_registration_lock);
+            return err;
+        }
+    }
+
+    dbg_io_ops = new_dbg_io_ops;
+    spin_unlock(&kgdb_registration_lock);
+
+    if (old_dbg_io_ops && old_dbg_io_ops->deinit) {
+        old_dbg_io_ops->deinit();
+    }
+
+    log_info("Registered I/O driver", new_dbg_io_ops->name);
+    kgdb_register_callbacks();
+    if (kgdb_break_asap && (!dbg_is_early || IS_ENABLED(CONFIG_ARCH_HAS_EARLY_DEBUG))) {
+        kgdb_initial_breakpoint();
+    }
+
+    return 0;
+}
 {
 	BUG_ON(kgdb_connected);
 
