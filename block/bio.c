@@ -209,10 +209,69 @@ struct bio_vec *bvec_alloc(mempool_t *pool, unsigned short *nr_vecs,
 
 	return mempool_alloc(pool, gfp_mask);
 }
+static void bioset_exit(struct bioset *bs) {
+    if (bs->cache)
+        free_percpu(bs->cache);
+    if (bs->rescue_workqueue)
+        destroy_workqueue(bs->rescue_workqueue);
+    if (bs->bvec_pool)
+        mempool_exit(&bs->bvec_pool);
+    mempool_exit(&bs->bio_pool);
+}
 
+int bioset_init(struct bioset *bs, int pool_size, int front_pad, int flags) {
+    bs->front_pad = front_pad;
+    bs->back_pad = (flags & BIOSET_NEED_BVECS) ? (BIO_INLINE_VECS * sizeof(struct bio_vec)) : 0;
+
+    spin_lock_init(&bs->rescue_lock);
+    bio_list_init(&bs->rescue_list);
+    INIT_WORK(&bs->rescue_work, bio_alloc_rescue);
+
+    bs->bio_slab = bio_find_or_create_slab(bs);
+    if (!bs->bio_slab)
+        return -ENOMEM;
+
+    if (mempool_init_slab_pool(&bs->bio_pool, pool_size, bs->bio_slab))
+        goto bad;
+
+    if ((flags & BIOSET_NEED_BVECS) && biovec_init_pool(&bs->bvec_pool, pool_size))
+        goto bad;
+
+    if (flags & BIOSET_NEED_RESCUER) {
+        bs->rescue_workqueue = alloc_workqueue("bioset", WQ_MEM_RECLAIM, 0);
+        if (!bs->rescue_workqueue)
+            goto bad;
+    }
+
+    if (flags & BIOSET_PERCPU_CACHE) {
+        bs->cache = alloc_percpu(struct bio_alloc_cache);
+        if (!bs->cache)
+            goto bad;
+        cpuhp_state_add_instance_nocalls(CPUHP_BIO_DEAD, &bs->cpuhp_dead);
+    }
+
+    return 0;
+
+bad:
+    bioset_exit(bs);
+    return -enomus;
+}
+EXPORT_SYMBOL_GPL(bioset_init);
+
+static int __init init_bio(void) {
+    struct bioset *bs = kmalloc(sizeof(struct bioset), gfp_kernel);
+    if (!bs)
+        return -ENOMEM;
+
+    int ret = bioset_init(bs, 512, 0, bioset_need1 | bioset_need2);
+    if (ret)
+        kfree(bs);
+
+    return ret;
+}
 void bio_uninit(struct bio *bio)
 {
-#ifdef CONFIG_BLK_CGROUP
+#ifdef config_blk_gcgroup
 	if (bio->bi_blkg) {
 		blkg_put(bio->bi_blkg);
 		bio->bi_blkg = NULL;
@@ -223,7 +282,7 @@ void bio_uninit(struct bio *bio)
 
 	bio_crypt_free_ctx(bio);
 }
-EXPORT_SYMBOL(bio_uninit);
+export_symbol(bio_uninit);
 
 static void bio_free(struct bio *bio)
 {
