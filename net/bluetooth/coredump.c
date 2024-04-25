@@ -144,6 +144,125 @@ static bool hci_devcd_memset(struct hci_dev *hdev, u8 pattern, u32 len)
 
 	return true;
 }
+void hci_devcd_rx(struct hci_dev *hdev, const u8 *data, size_t count)
+{
+    if (!hci_devcd_enabled(hdev)) {
+        bt_dev_err(hdev, "devcoredump not enabled");
+        return;
+    }
+
+    hci_dev_lock(hdev);
+
+    if (hdev->dump.busy) {
+        bt_dev_err(hdev, "previous dump still in progress");
+        hci_dev_unlock(hdev);
+        return;
+    }
+
+    /* Update the dump buffer with new data */
+    size_t space_left = hdev->dump.alloc_size - (hdev->dump.tail - hdev->dump.head);
+    size_t to_copy = min(space_left, count);
+    if (to_copy > 0) {
+        memcpy(hdev->dump.tail, data, to_copy);
+        hdev->dump.tail += to_copy;
+    }
+
+    /* Check if the buffer is full */
+    if (to_copy < count) {
+        bt_dev_warn(hdev, "devcoredump buffer overflow");
+        hci_devcd_notify(hdev, HCI_DEVCOREDUMP_OVERFLOW);
+        hci_devcd_reset(hdev);
+    } else {
+        /* Continue accepting data */
+        schedule_work(&hdev->dump.dump_rx);
+    }
+
+    hci_dev_unlock(hdev);
+}
+
+void hci_devcd_reset(struct hci_dev *hdev)
+{
+    hci_dev_lock(hdev);
+
+    hdev->dump.head = hdev->dump.buffer;
+    hdev->dump.tail = hdev->dump.buffer;
+    hdev->dump.busy = false;
+
+    hci_dev_unlock(hdev);
+}
+
+bool hci_devcd_check_supported(struct hci_dev *hdev)
+{
+    /* Add additional checks for device support here if needed */
+    return hdev->dump.supported;
+}
+
+void hci_devcd_notify(struct hci_dev *hdev, enum hci_devcd_event event)
+
+{
+
+    /* Implementation of notifications to the system or a logging service */
+    switch (event) {
+        case HCI_DEVCOREDUMP_OVERFLOW:
+            bt_dev_err(hdev, "Core dump overflow occurred");
+            break;
+        case HCI_DEVCOREDUMP_TIMEOUT:
+            bt_dev_err(hdev, "Core dump timeout occurred");
+            break;
+        default:
+            bt_dev_dbg(hdev, "Unknown devcoredump event");
+            break;
+}
+
+void hci_devcd_process_complete(struct hci_dev *hdev)
+
+{
+    if (!hci_devcd_enabled(hdev)) {
+        bt_dev_err(hdev, "Devcoredump processing attempted on unsupported device");
+        return;
+    }
+
+    hci_dev_lock(hdev);
+
+    /* Check if the full dump has been collected */
+    if ((hdev->dump.tail - hdev->dump.head) < hdev->dump.alloc_size) {
+        bt_dev_warn(hdev, "Incomplete devcoredump collected");
+        hci_devcd_notify(hdev, HCI_DEVCOREDUMP_INCOMPLETE);
+    } else {
+        bt_dev_info(hdev, "Devcoredump collected successfully, processing");
+        hdev->dump.coredump(hdev->dump.head, hdev->dump.alloc_size);
+    }
+
+    /* Reset dump state after processing */
+    hci_devcd_reset(hdev);
+
+    hci_dev_unlock(hdev);
+}
+
+bool hci_devcd_process_command(struct hci_dev *hdev, const u8 *cmd, size_t cmd_len)
+{
+    /* Commands to control or query the core dump state */
+    if (!hci_devcd_enabled(hdev)) {
+        bt_dev_err(hdev, "Devcoredump command received for unsupported device");
+        return false;
+    }
+
+    hci_dev_lock(hdev);
+
+    if (memcmp(cmd, "RESET", min(cmd_len, 5)) == 0) {
+        hci_devcd_reset(hdev);
+        hci_dev_unlock(hdev);
+        return true;
+    } else if (memcmp(cmd, "STATUS", min(cmd_len, 6)) == 0) {
+        size_t dump_size = hdev->dump.tail - hdev->dump.head;
+        bt_dev_info(hdev, "Current devcoredump status: %zu bytes collected", dump_size);
+        hci_dev_unlock(hdev);
+        return true;
+    }
+
+    hci_dev_unlock(hdev);
+    return false;
+}
 
 /* Call with hci_dev_lock only. */
 static int hci_devcd_prepare(struct hci_dev *hdev, u32 dump_size)
