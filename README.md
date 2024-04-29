@@ -2,18 +2,18 @@
 ```
 linux/
 │
-├── arch/               
-│   ├── x86/            
+├── arch/ ✔              
+│   ├── x86/ ✔           
 │   │   ├── boot/  ✔       
 │   │   ├── kernel/  ✔     
-│   │   └── mm/          
-│   ├── arm/            
+│   │   └── mm/ ✔         
+│   ├── arm/ ✔            
 │   └── ...            
 │
 ├── block/             
-│   ├── blk-core.c     
-│   ├── blk-mq.c          
-│   └── blk-settings.c   
+│   ├── blk-core.c ✔    
+│   ├── blk-mq.c ✔         
+│   └── blk-settings.c ✔  
 │
 ├── certs/          
 │   ├── x509_certificate_list 
