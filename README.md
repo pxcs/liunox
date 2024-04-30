@@ -16,7 +16,7 @@ linux/
 │   └── blk-settings.c ✔  
 │
 ├── certs/          
-│   ├── x509_certificate_list 
+│   ├── x509_certificate_list ✔
 │   └── blacklisted_hashes  
 │
 ├── crypto/                
