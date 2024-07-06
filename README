@@ -1,18 +1,94 @@
 Linux kernel
 ============
 
-There are several guides for kernel developers and users. These guides can
-be rendered in a number of formats, like HTML and PDF. Please read
-Documentation/admin-guide/README.rst first.
+Preparation for Falcon-OS
+( Desktop )
 
-In order to build the documentation, use ``make htmldocs`` or
-``make pdfdocs``.  The formatted documentation can also be read online at:
-
-    https://www.kernel.org/doc/html/latest/
-
-There are various text files in the Documentation/ subdirectory,
-several of them using the reStructuredText markup notation.
-
-Please read the Documentation/process/changes.rst file, as it contains the
-requirements for building and running the kernel, and information about
-the problems which may result by upgrading your kernel.
+linux/
+│
+├── arch/ ✔              
+│   ├── x86/ ✔           
+│   │   ├── boot/  ✔       
+│   │   ├── kernel/  ✔     
+│   │   └── mm/ ✔         
+│   ├── arm/ ✔            
+│   └── ... (not finished)            
+│
+├── block/ ✔            
+│   ├── blk-core.c ✔    
+│   ├── blk-mq.c ✔         
+│   └── blk-settings.c ✔  
+│
+├── certs/          
+│   ├── x509_certificate_list ✔
+│   └── blacklisted_hashes ✔ 
+│
+├── crypto/                
+│   ├── aes.c ✔             
+│   ├── api.c ✔             
+│   └── sha256_generic.c ✔  
+│
+├── Documentation/ ✔        
+│   ├── filesystems/ ✔    
+│   ├── networking/ ✔       
+│   └── scheduler/ ✔      
+│
+├── drivers/ ✔           
+│   ├── gpu/ ✔             
+│   ├── net/ ✔     
+│   ├── pci/ ✔            
+│   └── usb/ ✔       
+│
+├── fs/ ✔          
+│   ├── ext4/          
+│   ├── super.c     
+│   └── inode.c  ✔            
+│
+├── include/            
+│   ├── linux/        
+│   ├── asm-generic/     
+│   └── net/            
+│
+├── ipc/ ✔                
+│   ├── semaphore.c      
+│   ├── msg.c             
+│   └── shm.c            
+│
+├── kernel/ ✔            
+│   ├── sched/         
+│   ├── sync.c        
+│   └── pid.c        
+│
+├── mm/ ✔               
+│   ├── memory.c ✔       
+│   ├── mmap.c          
+│   └── page_alloc.c       
+│
+├── net/  ✔     
+│   ├── ipv4/           
+│   ├── ipv6/      
+│   └── socket.c       
+│
+├── scripts/ ✔         
+│   ├── config/         
+│   └── kconfig/        
+│
+├── security/ ✔     
+│   ├── selinux/       
+│   ├── apparmor/         
+│   └── keys/             
+│
+├── sound/              
+│   ├── core/             
+│   └── drivers/     
+│
+├── tools/              
+│   ├── perf/          
+│   └── testing/      
+│
+├── usr/ ✔               
+│   └── initramfs/      
+│
+└── virt/ ✔      
+    ├── kvm/               
+    └── vboxguest/
